@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /postit_notes/{noteId} {
+      // Test app: requires Firebase anonymous sign-in, but all signed-in test users
+      // can see the shared board. Do not use this as-is for private/production notes.
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          'text', 'color', 'remind_at', 'created_at', 'reminder_fired'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.color is string
+        && request.resource.data.color.size() <= 20
+        && request.resource.data.created_at is int
+        && (request.resource.data.remind_at == null
+            || request.resource.data.remind_at is int)
+        && request.resource.data.reminder_fired == false;
+
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['remind_at', 'reminder_fired'])
+        && (request.resource.data.remind_at == null
+            || request.resource.data.remind_at is int)
+        && request.resource.data.reminder_fired is bool;
+
+      allow delete: if request.auth != null;
+    }
+  }
+}
