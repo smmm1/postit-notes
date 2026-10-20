@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#fff8e8">
+<title>โน้ตโพสต์อิท</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#433d39;--paper:#fffdf7;--line:#e9e1d4;--pink:#ffdbe5;--yellow:#fff1a8;--blue:#d8edff;--green:#d9f5d7;--purple:#e9dcff;--shadow:0 8px 20px #69583c18}
+*{box-sizing:border-box}body{margin:0;background:#fffaf0;color:var(--ink);font-family:'Sarabun',sans-serif;min-height:100vh;background-image:radial-gradient(#e6d9c5 0.7px,transparent .7px);background-size:18px 18px}
+header{max-width:1100px;margin:auto;padding:30px 22px 12px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{font-family:'Mali',cursive;font-size:clamp(1.8rem,4vw,2.6rem);margin:0;letter-spacing:-1px}header p{margin:4px 0;color:#8d8072}.status{font-size:.9rem;padding:7px 12px;border-radius:99px;background:#fff;border:1px solid var(--line)}
+main{max-width:1100px;margin:0 auto;padding:16px 22px 44px}.composer{background:#fffdf9;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr;gap:12px}.composer textarea{grid-column:1/-1;resize:vertical;min-height:88px}
+input,textarea,select,button{font:inherit;color:inherit}input,textarea,select{width:100%;border:1px solid #e6ddcf;background:#fff;border-radius:11px;padding:11px 12px;outline:none}input:focus,textarea:focus,select:focus{border-color:#d2a6a9;box-shadow:0 0 0 3px #ffdbe566}.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.color-pick{display:flex;gap:8px;align-items:center}.swatch{width:27px;height:27px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #d7ccbd;cursor:pointer}.swatch.active{box-shadow:0 0 0 2px #554b42}.primary{border:0;background:#554b42;color:white;border-radius:11px;padding:11px 18px;cursor:pointer;font-weight:700}.primary:hover{background:#75675a}.board-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:28px 0 14px}.board-head h2{font-family:'Mali',cursive;margin:0;font-size:1.35rem}.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,225px),1fr));gap:18px}.note{position:relative;min-height:185px;padding:22px 17px 15px;box-shadow:var(--shadow);border-radius:3px 3px 12px 3px;transform:rotate(var(--tilt,0deg));transition:transform .18s,box-shadow .18s;overflow-wrap:anywhere}.note:hover{transform:rotate(0deg) translateY(-3px);box-shadow:0 14px 24px #69583c24}.note:before{content:"";position:absolute;top:0;left:calc(50% - 28px);width:56px;height:14px;background:#ffffff7a;transform:rotate(-2deg)}.note p{white-space:pre-wrap;margin:8px 0 20px;line-height:1.55}.note small{font-size:.8rem;opacity:.72}.note-actions{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px dashed #554b4230;padding-top:9px}.mini{border:0;background:#ffffff80;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:.82rem}.mini:hover{background:#fff}.reminder{font-size:.78rem;margin-top:8px}.empty{grid-column:1/-1;text-align:center;padding:46px 20px;color:#958778;background:#ffffffa8;border:1px dashed #ddcfbb;border-radius:16px}.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#433d39;color:#fff;padding:10px 16px;border-radius:99px;box-shadow:var(--shadow);display:none;z-index:5}.peel{animation:peel .42s forwards}@keyframes peel{to{opacity:0;transform:rotate(16deg) translateY(-40px) scale(.75)}}.warning{margin-top:14px;padding:10px 12px;background:#fff2d7;border-radius:10px;font-size:.9rem;display:none}
+@media(max-width:600px){header{padding-top:22px}.composer{grid-template-columns:1fr}.composer textarea{grid-column:auto}.board-head{align-items:flex-start;flex-direction:column}.note{transform:none}}
+</style>
+</head>
+<body>
+<header><div><h1>📝 โน้ตโพสต์อิท</h1><p>จดไว้ก่อน เดี๋ยวค่อยไปทำ ✨</p></div><span class="status" id="status">กำลังเชื่อมต่อฐานข้อมูล…</span></header>
+<main>
+<section class="composer" aria-label="เขียนโน้ต">
+<textarea id="noteText" placeholder="วันนี้อยากจำอะไรไว้บ้าง…" maxlength="2000" aria-label="ข้อความโน้ต"></textarea>
+<div><label for="remindAt">⏰ เตือนความจำ (ไม่บังคับ)</label><input id="remindAt" type="datetime-local"></div>
+<div class="controls"><span>สีโน้ต</span><div class="color-pick" id="colors"></div></div>
+<div class="controls" style="grid-column:1/-1;justify-content:flex-end"><button class="primary" id="addBtn">＋ เพิ่มโน้ต</button></div>
+</section>
+<div id="warning" class="warning"></div>
+<div class="board-head"><h2>📌 กระดานโน้ตของเรา</h2><span id="count">0 โน้ต</span></div>
+<section id="notes" class="notes"><div class="empty">กำลังโหลดโน้ต…</div></section>
+</main><div id="toast" class="toast" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ตั้งค่าเหล่านี้หลังสร้าง Supabase project: ใช้ Project URL และ publishable/anon key เท่านั้น */
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
+const TABLE = 'postit_notes';
+const palette = [
+ {name:'เหลือง',value:'#fff1a8'},{name:'ชมพู',value:'#ffdbe5'},
+ {name:'ฟ้า',value:'#d8edff'},{name:'เขียว',value:'#d9f5d7'},{name:'ม่วง',value:'#e9dcff'}
+];
+let selectedColor=palette[0].value, notes=[], db=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',2400)}
+function status(s){$('status').textContent=s}
+function showWarning(s){$('warning').textContent=s;$('warning').style.display='block'}
+function setupColors(){$('colors').innerHTML=palette.map((p,i)=>'<button type="button" class="swatch '+(i===0?'active':'')+'" title="'+p.name+'" aria-label="เลือกสี'+p.name+'" style="background:'+p.value+'" data-color="'+p.value+'"></button>').join('');$('colors').addEventListener('click',e=>{const b=e.target.closest('[data-color]');if(!b)return;selectedColor=b.dataset.color;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x===b))})}
+function fmt(d){if(!d)return '';const date=new Date(d);return Number.isNaN(+date)?'':date.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}
+function render(){ $('count').textContent=notes.length+' โน้ต';if(!notes.length){$('notes').innerHTML='<div class="empty">🌼 กระดานยังว่างอยู่ เขียนโน้ตใบแรกกันเลย!</div>';return}
+$('notes').innerHTML=notes.map((n,i)=>'<article class="note" data-id="'+esc(n.id)+'" style="background:'+esc(n.color||palette[0].value)+';--tilt:'+([-1.1,.7,-.5,1.2][i%4])+'deg"><p>'+esc(n.text)+'</p>'+(n.remind_at?'<div class="reminder">⏰ '+esc(fmt(n.remind_at))+'</div>':'')+'<div class="note-actions"><small>🗓 '+esc(fmt(n.created_at))+'</small><div>'+(n.remind_at?'<button class="mini" data-action="unremind">ยกเลิกเตือน</button>':'')+' <button class="mini" data-action="delete">ลอกออก ✕</button></div></div></article>').join('')}
+async function loadNotes(){status('กำลังโหลด…');const {data,error}=await db.from(TABLE).select('*').order('created_at',{ascending:false});if(error){status('เชื่อมต่อไม่สำเร็จ');showWarning('โหลดโน้ตไม่ได้: '+error.message+' — ตรวจสอบว่าได้สร้างตารางและนโยบาย public access ใน Supabase แล้ว');$('notes').innerHTML='<div class="empty">ยังเชื่อมฐานข้อมูลไม่สำเร็จ</div>';return}notes=data||[];render();status('เชื่อมต่อแล้ว ☁️')}
+async function addNote(){const text=$('noteText').value.trim();if(!text){toast('เขียนข้อความก่อนนะ');$('noteText').focus();return}const remind=$('remindAt').value?new Date($('remindAt').value).toISOString():null;const {error}=await db.from(TABLE).insert({text,color:selectedColor,remind_at:remind});if(error){toast('บันทึกไม่สำเร็จ');showWarning('บันทึกไม่ได้: '+error.message);return}$('noteText').value='';$('remindAt').value='';await loadNotes();toast('เพิ่มโน้ตแล้ว ✨');if(remind&&Notification.permission==='default')Notification.requestPermission()}
+async function deleteNote(id,el){if(!confirm('ลอกโน้ตใบนี้ออกจากกระดานใช่ไหม?'))return;el?.classList.add('peel');const {error}=await db.from(TABLE).delete().eq('id',id);if(error){toast('ลบไม่สำเร็จ');showWarning(error.message);return}await loadNotes();toast('ลบโน้ตแล้ว')}
+async function unremind(id){const {error}=await db.from(TABLE).update({remind_at:null}).eq('id',id);if(error){toast('ยกเลิกเตือนไม่สำเร็จ');return}await loadNotes();toast('ยกเลิกการเตือนแล้ว')}
+$('addBtn').addEventListener('click',addNote);
+$('notes').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const card=b.closest('[data-id]');if(b.dataset.action==='delete')deleteNote(card.dataset.id,card);if(b.dataset.action==='unremind')unremind(card.dataset.id)});
+function checkReminders(){if(!db||Notification.permission!=='granted')return;const now=Date.now();notes.forEach(async n=>{if(n.remind_at&&!n.reminder_fired&&new Date(n.remind_at).getTime()<=now){const {error}=await db.from(TABLE).update({reminder_fired:true}).eq('id',n.id).eq('reminder_fired',false);if(!error)new Notification('⏰ เตือนความจำ',{body:n.text})}})}
+async function init(){setupColors();if(SUPABASE_URL.startsWith('YOUR_')||SUPABASE_KEY.startsWith('YOUR_')){status('ยังไม่ได้ตั้งค่าฐานข้อมูล');showWarning('เว็บนี้ยังรอการตั้งค่า Supabase URL และ publishable key ก่อนใช้งานจริง');$('notes').innerHTML='<div class="empty">🛠️ รอตั้งค่าฐานข้อมูล Supabase</div>';return}db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);await loadNotes();setInterval(async()=>{await loadNotes();checkReminders()},10000)}
+init();
+</script>
+</body>
+</html>
