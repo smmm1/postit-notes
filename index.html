@@ -19,7 +19,7 @@ input,textarea,select,button{font:inherit;color:inherit}input,textarea,select{wi
 </style>
 </head>
 <body>
-<header><div><h1>📝 โน้ตโพสต์อิท</h1><p>จดไว้ก่อน เดี๋ยวค่อยไปทำ ✨</p></div><span class="status" id="status">กำลังเชื่อมต่อฐานข้อมูล…</span></header>
+<header><div><h1>📝 โน้ตโพสต์อิท</h1><p>จดไว้ก่อน เดี๋ยวค่อยไปทำ ✨</p></div><span class="status" id="status">🧪 ต้นแบบทดลอง</span></header>
 <main>
 <section class="composer" aria-label="เขียนโน้ต">
 <textarea id="noteText" placeholder="วันนี้อยากจำอะไรไว้บ้าง…" maxlength="2000" aria-label="ข้อความโน้ต"></textarea>
@@ -31,103 +31,21 @@ input,textarea,select,button{font:inherit;color:inherit}input,textarea,select{wi
 <div class="board-head"><h2>📌 กระดานโน้ตของเรา</h2><span id="count">0 โน้ต</span></div>
 <section id="notes" class="notes"><div class="empty">กำลังโหลดโน้ต…</div></section>
 </main><div id="toast" class="toast" role="status"></div>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-/*
-  FIREBASE SETUP:
-  1) Create a Firebase project and register a Web app.
-  2) Paste the Web app config values below (Firebase client config, not service-account keys).
-  3) Enable Authentication > Sign-in method > Anonymous.
-  4) Create Cloud Firestore, then publish the rules from firestore.rules in this repository.
-*/
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
-};
-const COLLECTION = "postit_notes";
-const palette = [
- {name:'เหลือง',value:'#fff1a8'},{name:'ชมพู',value:'#ffdbe5'},
- {name:'ฟ้า',value:'#d8edff'},{name:'เขียว',value:'#d9f5d7'},{name:'ม่วง',value:'#e9dcff'}
-];
-let selectedColor=palette[0].value, notes=[], db=null, unsubscribe=null;
-const $=id=>document.getElementById(id);
+const palette=[{name:'เหลือง',value:'#fff1a8'},{name:'ชมพู',value:'#ffdbe5'},{name:'ฟ้า',value:'#d8edff'},{name:'เขียว',value:'#d9f5d7'},{name:'ม่วง',value:'#e9dcff'}];
+const STORAGE_KEY='postit-notes-demo-v1';let selectedColor=palette[0].value,notes=[];const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',2400)}
-function status(s){$('status').textContent=s}
 function showWarning(s){$('warning').textContent=s;$('warning').style.display='block'}
+function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(notes))}catch(e){showWarning('พื้นที่เก็บข้อมูลของเบราว์เซอร์ไม่พอ')}}
 function setupColors(){$('colors').innerHTML=palette.map((p,i)=>'<button type="button" class="swatch '+(i===0?'active':'')+'" title="'+p.name+'" aria-label="เลือกสี'+p.name+'" style="background:'+p.value+'" data-color="'+p.value+'"></button>').join('');$('colors').addEventListener('click',e=>{const b=e.target.closest('[data-color]');if(!b)return;selectedColor=b.dataset.color;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x===b))})}
-function fmt(d){if(!d)return '';const date=typeof d==='number'?new Date(d):d.toDate?d.toDate():new Date(d);return Number.isNaN(+date)?'':date.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}
-function render(){
- $('count').textContent=notes.length+' โน้ต';
- if(!notes.length){$('notes').innerHTML='<div class="empty">🌼 กระดานยังว่างอยู่ เขียนโน้ตใบแรกกันเลย!</div>';return}
- $('notes').innerHTML=notes.map((n,i)=>'<article class="note" data-id="'+esc(n.id)+'" style="background:'+esc(n.color||palette[0].value)+';--tilt:'+([-1.1,.7,-.5,1.2][i%4])+'deg"><p>'+esc(n.text)+'</p>'+(n.remind_at?'<div class="reminder">⏰ '+esc(fmt(n.remind_at))+'</div>':'')+'<div class="note-actions"><small>🗓 '+esc(fmt(n.created_at))+'</small><div>'+(n.remind_at?'<button class="mini" data-action="unremind">ยกเลิกเตือน</button>':'')+' <button class="mini" data-action="delete">ลอกออก ✕</button></div></div></article>').join('')
-}
-function listenNotes(){
- status('กำลังโหลด…');
- if(unsubscribe)unsubscribe();
- unsubscribe=db.collection(COLLECTION).orderBy('created_at','desc').onSnapshot(snapshot=>{
-   notes=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
-   render();status('เชื่อมต่อคลาวด์แล้ว ☁️');$('warning').style.display='none';checkReminders();
- },error=>{
-   status('เชื่อมต่อไม่สำเร็จ');
-   showWarning('อ่านโน้ตไม่ได้: '+error.message+' — ตรวจสอบ Firestore Rules และการตั้งค่า Firebase');
- });
-}
-async function addNote(){
- const text=$('noteText').value.trim();
- if(!text){toast('เขียนข้อความก่อนนะ');$('noteText').focus();return}
- const remind=$('remindAt').value?new Date($('remindAt').value).getTime():null;
- try{
-   await db.collection(COLLECTION).add({text,color:selectedColor,remind_at:remind,created_at:Date.now(),reminder_fired:false});
-   $('noteText').value='';$('remindAt').value='';toast('เพิ่มโน้ตแล้ว ✨');
-   if(remind&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission();
- }catch(error){toast('บันทึกไม่สำเร็จ');showWarning('บันทึกไม่ได้: '+error.message)}
-}
-async function deleteNote(id,el){
- if(!confirm('ลอกโน้ตใบนี้ออกจากกระดานใช่ไหม?'))return;
- el?.classList.add('peel');
- try{await db.collection(COLLECTION).doc(id).delete();toast('ลบโน้ตแล้ว')}
- catch(error){toast('ลบไม่สำเร็จ');showWarning(error.message);el?.classList.remove('peel')}
-}
-async function unremind(id){
- try{await db.collection(COLLECTION).doc(id).update({remind_at:null});toast('ยกเลิกการเตือนแล้ว')}
- catch(error){toast('ยกเลิกเตือนไม่สำเร็จ');showWarning(error.message)}
-}
-$('addBtn').addEventListener('click',addNote);
-$('notes').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const card=b.closest('[data-id]');if(b.dataset.action==='delete')deleteNote(card.dataset.id,card);if(b.dataset.action==='unremind')unremind(card.dataset.id)});
-async function checkReminders(){
- if(!db||!('Notification'in window)||Notification.permission!=='granted')return;
- const now=Date.now();
- for(const n of notes){
-   if(n.remind_at&&!n.reminder_fired&&Number(n.remind_at)<=now){
-     try{await db.collection(COLLECTION).doc(n.id).update({reminder_fired:true});new Notification('⏰ เตือนความจำ',{body:n.text})}catch(e){console.warn('Reminder update failed',e)}
-   }
- }
-}
-async function init(){
- setupColors();
- if(firebaseConfig.apiKey.startsWith('YOUR_')||firebaseConfig.projectId.startsWith('YOUR_')||firebaseConfig.appId.startsWith('YOUR_')){
-   status('รอตั้งค่า Firebase');
-   showWarning('เว็บพร้อมเชื่อม Firebase แล้ว แต่ยังต้องใส่ค่าจาก Firebase Console ใน firebaseConfig ก่อน');
-   $('notes').innerHTML='<div class="empty">☁️ รอตั้งค่าฐานข้อมูล Firebase</div>';return;
- }
- try{
-   firebase.initializeApp(firebaseConfig);
-   const auth=firebase.auth();
-   db=firebase.firestore();
-   status('กำลังเข้าสู่ระบบทดลอง…');
-   await auth.signInAnonymously();
-   listenNotes();
- }catch(error){
-   status('เชื่อมต่อไม่สำเร็จ');
-   showWarning('เริ่ม Firebase ไม่สำเร็จ: '+error.message+' — ตรวจสอบว่าตั้งค่า Anonymous Authentication และ Firestore แล้ว');
-   $('notes').innerHTML='<div class="empty">ยังเชื่อมฐานข้อมูลไม่สำเร็จ</div>';
- }
-}
+function fmt(d){if(!d)return '';const date=new Date(d);return Number.isNaN(+date)?'':date.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}
+function render(){$('count').textContent=notes.length+' โน้ต';if(!notes.length){$('notes').innerHTML='<div class="empty">🌼 กระดานยังว่างอยู่ เขียนโน้ตใบแรกกันเลย!</div>';return}$('notes').innerHTML=notes.map((n,i)=>'<article class="note" data-id="'+esc(n.id)+'" style="background:'+esc(n.color||palette[0].value)+';--tilt:'+([-1.1,.7,-.5,1.2][i%4])+'deg"><p>'+esc(n.text)+'</p>'+(n.remind_at?'<div class="reminder">⏰ '+esc(fmt(n.remind_at))+'</div>':'')+'<div class="note-actions"><small>🗓 '+esc(fmt(n.created_at))+'</small><div>'+(n.remind_at?'<button class="mini" data-action="unremind">ยกเลิกเตือน</button>':'')+' <button class="mini" data-action="delete">ลอกออก ✕</button></div></div></article>').join('')}
+function addNote(){const text=$('noteText').value.trim();if(!text){toast('เขียนข้อความก่อนนะ');$('noteText').focus();return}const remind=$('remindAt').value?new Date($('remindAt').value).getTime():null;notes.unshift({id:window.crypto&&crypto.randomUUID?crypto.randomUUID():String(Date.now()),text,color:selectedColor,remind_at:remind,created_at:Date.now()});save();render();$('noteText').value='';$('remindAt').value='';toast('เพิ่มโน้ตแล้ว ✨')}
+function deleteNote(id,el){if(!confirm('ลอกโน้ตใบนี้ออกจากกระดานใช่ไหม?'))return;el?.classList.add('peel');notes=notes.filter(n=>n.id!==id);save();render();toast('ลบโน้ตแล้ว')}
+function unremind(id){notes=notes.map(n=>n.id===id?{...n,remind_at:null}:n);save();render();toast('ยกเลิกการเตือนแล้ว')}
+$('addBtn').addEventListener('click',addNote);$('noteText').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')addNote()});$('notes').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const card=b.closest('[data-id]');if(b.dataset.action==='delete')deleteNote(card.dataset.id,card);if(b.dataset.action==='unremind')unremind(card.dataset.id)});
+function init(){setupColors();try{notes=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');if(!Array.isArray(notes))notes=[]}catch(e){notes=[]}render();showWarning('โหมดต้นแบบ: โน้ตจะบันทึกไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น ยังไม่ซิงก์ข้ามอุปกรณ์ และอาจหายได้หากล้างข้อมูลเว็บไซต์')}
 init();
 </script>
 </body>
