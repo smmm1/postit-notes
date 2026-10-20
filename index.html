@@ -31,34 +31,103 @@ input,textarea,select,button{font:inherit;color:inherit}input,textarea,select{wi
 <div class="board-head"><h2>📌 กระดานโน้ตของเรา</h2><span id="count">0 โน้ต</span></div>
 <section id="notes" class="notes"><div class="empty">กำลังโหลดโน้ต…</div></section>
 </main><div id="toast" class="toast" role="status"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-/* ตั้งค่าเหล่านี้หลังสร้าง Supabase project: ใช้ Project URL และ publishable/anon key เท่านั้น */
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
-const TABLE = 'postit_notes';
+/*
+  FIREBASE SETUP:
+  1) Create a Firebase project and register a Web app.
+  2) Paste the Web app config values below (Firebase client config, not service-account keys).
+  3) Enable Authentication > Sign-in method > Anonymous.
+  4) Create Cloud Firestore, then publish the rules from firestore.rules in this repository.
+*/
+const firebaseConfig = {
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  appId: "YOUR_FIREBASE_APP_ID"
+};
+const COLLECTION = "postit_notes";
 const palette = [
  {name:'เหลือง',value:'#fff1a8'},{name:'ชมพู',value:'#ffdbe5'},
  {name:'ฟ้า',value:'#d8edff'},{name:'เขียว',value:'#d9f5d7'},{name:'ม่วง',value:'#e9dcff'}
 ];
-let selectedColor=palette[0].value, notes=[], db=null;
+let selectedColor=palette[0].value, notes=[], db=null, unsubscribe=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',2400)}
 function status(s){$('status').textContent=s}
 function showWarning(s){$('warning').textContent=s;$('warning').style.display='block'}
 function setupColors(){$('colors').innerHTML=palette.map((p,i)=>'<button type="button" class="swatch '+(i===0?'active':'')+'" title="'+p.name+'" aria-label="เลือกสี'+p.name+'" style="background:'+p.value+'" data-color="'+p.value+'"></button>').join('');$('colors').addEventListener('click',e=>{const b=e.target.closest('[data-color]');if(!b)return;selectedColor=b.dataset.color;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x===b))})}
-function fmt(d){if(!d)return '';const date=new Date(d);return Number.isNaN(+date)?'':date.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}
-function render(){ $('count').textContent=notes.length+' โน้ต';if(!notes.length){$('notes').innerHTML='<div class="empty">🌼 กระดานยังว่างอยู่ เขียนโน้ตใบแรกกันเลย!</div>';return}
-$('notes').innerHTML=notes.map((n,i)=>'<article class="note" data-id="'+esc(n.id)+'" style="background:'+esc(n.color||palette[0].value)+';--tilt:'+([-1.1,.7,-.5,1.2][i%4])+'deg"><p>'+esc(n.text)+'</p>'+(n.remind_at?'<div class="reminder">⏰ '+esc(fmt(n.remind_at))+'</div>':'')+'<div class="note-actions"><small>🗓 '+esc(fmt(n.created_at))+'</small><div>'+(n.remind_at?'<button class="mini" data-action="unremind">ยกเลิกเตือน</button>':'')+' <button class="mini" data-action="delete">ลอกออก ✕</button></div></div></article>').join('')}
-async function loadNotes(){status('กำลังโหลด…');const {data,error}=await db.from(TABLE).select('*').order('created_at',{ascending:false});if(error){status('เชื่อมต่อไม่สำเร็จ');showWarning('โหลดโน้ตไม่ได้: '+error.message+' — ตรวจสอบว่าได้สร้างตารางและนโยบาย public access ใน Supabase แล้ว');$('notes').innerHTML='<div class="empty">ยังเชื่อมฐานข้อมูลไม่สำเร็จ</div>';return}notes=data||[];render();status('เชื่อมต่อแล้ว ☁️')}
-async function addNote(){const text=$('noteText').value.trim();if(!text){toast('เขียนข้อความก่อนนะ');$('noteText').focus();return}const remind=$('remindAt').value?new Date($('remindAt').value).toISOString():null;const {error}=await db.from(TABLE).insert({text,color:selectedColor,remind_at:remind});if(error){toast('บันทึกไม่สำเร็จ');showWarning('บันทึกไม่ได้: '+error.message);return}$('noteText').value='';$('remindAt').value='';await loadNotes();toast('เพิ่มโน้ตแล้ว ✨');if(remind&&Notification.permission==='default')Notification.requestPermission()}
-async function deleteNote(id,el){if(!confirm('ลอกโน้ตใบนี้ออกจากกระดานใช่ไหม?'))return;el?.classList.add('peel');const {error}=await db.from(TABLE).delete().eq('id',id);if(error){toast('ลบไม่สำเร็จ');showWarning(error.message);return}await loadNotes();toast('ลบโน้ตแล้ว')}
-async function unremind(id){const {error}=await db.from(TABLE).update({remind_at:null}).eq('id',id);if(error){toast('ยกเลิกเตือนไม่สำเร็จ');return}await loadNotes();toast('ยกเลิกการเตือนแล้ว')}
+function fmt(d){if(!d)return '';const date=typeof d==='number'?new Date(d):d.toDate?d.toDate():new Date(d);return Number.isNaN(+date)?'':date.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}
+function render(){
+ $('count').textContent=notes.length+' โน้ต';
+ if(!notes.length){$('notes').innerHTML='<div class="empty">🌼 กระดานยังว่างอยู่ เขียนโน้ตใบแรกกันเลย!</div>';return}
+ $('notes').innerHTML=notes.map((n,i)=>'<article class="note" data-id="'+esc(n.id)+'" style="background:'+esc(n.color||palette[0].value)+';--tilt:'+([-1.1,.7,-.5,1.2][i%4])+'deg"><p>'+esc(n.text)+'</p>'+(n.remind_at?'<div class="reminder">⏰ '+esc(fmt(n.remind_at))+'</div>':'')+'<div class="note-actions"><small>🗓 '+esc(fmt(n.created_at))+'</small><div>'+(n.remind_at?'<button class="mini" data-action="unremind">ยกเลิกเตือน</button>':'')+' <button class="mini" data-action="delete">ลอกออก ✕</button></div></div></article>').join('')
+}
+function listenNotes(){
+ status('กำลังโหลด…');
+ if(unsubscribe)unsubscribe();
+ unsubscribe=db.collection(COLLECTION).orderBy('created_at','desc').onSnapshot(snapshot=>{
+   notes=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
+   render();status('เชื่อมต่อคลาวด์แล้ว ☁️');$('warning').style.display='none';checkReminders();
+ },error=>{
+   status('เชื่อมต่อไม่สำเร็จ');
+   showWarning('อ่านโน้ตไม่ได้: '+error.message+' — ตรวจสอบ Firestore Rules และการตั้งค่า Firebase');
+ });
+}
+async function addNote(){
+ const text=$('noteText').value.trim();
+ if(!text){toast('เขียนข้อความก่อนนะ');$('noteText').focus();return}
+ const remind=$('remindAt').value?new Date($('remindAt').value).getTime():null;
+ try{
+   await db.collection(COLLECTION).add({text,color:selectedColor,remind_at:remind,created_at:Date.now(),reminder_fired:false});
+   $('noteText').value='';$('remindAt').value='';toast('เพิ่มโน้ตแล้ว ✨');
+   if(remind&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission();
+ }catch(error){toast('บันทึกไม่สำเร็จ');showWarning('บันทึกไม่ได้: '+error.message)}
+}
+async function deleteNote(id,el){
+ if(!confirm('ลอกโน้ตใบนี้ออกจากกระดานใช่ไหม?'))return;
+ el?.classList.add('peel');
+ try{await db.collection(COLLECTION).doc(id).delete();toast('ลบโน้ตแล้ว')}
+ catch(error){toast('ลบไม่สำเร็จ');showWarning(error.message);el?.classList.remove('peel')}
+}
+async function unremind(id){
+ try{await db.collection(COLLECTION).doc(id).update({remind_at:null});toast('ยกเลิกการเตือนแล้ว')}
+ catch(error){toast('ยกเลิกเตือนไม่สำเร็จ');showWarning(error.message)}
+}
 $('addBtn').addEventListener('click',addNote);
 $('notes').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const card=b.closest('[data-id]');if(b.dataset.action==='delete')deleteNote(card.dataset.id,card);if(b.dataset.action==='unremind')unremind(card.dataset.id)});
-function checkReminders(){if(!db||Notification.permission!=='granted')return;const now=Date.now();notes.forEach(async n=>{if(n.remind_at&&!n.reminder_fired&&new Date(n.remind_at).getTime()<=now){const {error}=await db.from(TABLE).update({reminder_fired:true}).eq('id',n.id).eq('reminder_fired',false);if(!error)new Notification('⏰ เตือนความจำ',{body:n.text})}})}
-async function init(){setupColors();if(SUPABASE_URL.startsWith('YOUR_')||SUPABASE_KEY.startsWith('YOUR_')){status('ยังไม่ได้ตั้งค่าฐานข้อมูล');showWarning('เว็บนี้ยังรอการตั้งค่า Supabase URL และ publishable key ก่อนใช้งานจริง');$('notes').innerHTML='<div class="empty">🛠️ รอตั้งค่าฐานข้อมูล Supabase</div>';return}db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);await loadNotes();setInterval(async()=>{await loadNotes();checkReminders()},10000)}
+async function checkReminders(){
+ if(!db||!('Notification'in window)||Notification.permission!=='granted')return;
+ const now=Date.now();
+ for(const n of notes){
+   if(n.remind_at&&!n.reminder_fired&&Number(n.remind_at)<=now){
+     try{await db.collection(COLLECTION).doc(n.id).update({reminder_fired:true});new Notification('⏰ เตือนความจำ',{body:n.text})}catch(e){console.warn('Reminder update failed',e)}
+   }
+ }
+}
+async function init(){
+ setupColors();
+ if(firebaseConfig.apiKey.startsWith('YOUR_')||firebaseConfig.projectId.startsWith('YOUR_')||firebaseConfig.appId.startsWith('YOUR_')){
+   status('รอตั้งค่า Firebase');
+   showWarning('เว็บพร้อมเชื่อม Firebase แล้ว แต่ยังต้องใส่ค่าจาก Firebase Console ใน firebaseConfig ก่อน');
+   $('notes').innerHTML='<div class="empty">☁️ รอตั้งค่าฐานข้อมูล Firebase</div>';return;
+ }
+ try{
+   firebase.initializeApp(firebaseConfig);
+   const auth=firebase.auth();
+   db=firebase.firestore();
+   status('กำลังเข้าสู่ระบบทดลอง…');
+   await auth.signInAnonymously();
+   listenNotes();
+ }catch(error){
+   status('เชื่อมต่อไม่สำเร็จ');
+   showWarning('เริ่ม Firebase ไม่สำเร็จ: '+error.message+' — ตรวจสอบว่าตั้งค่า Anonymous Authentication และ Firestore แล้ว');
+   $('notes').innerHTML='<div class="empty">ยังเชื่อมฐานข้อมูลไม่สำเร็จ</div>';
+ }
+}
 init();
 </script>
 </body>
